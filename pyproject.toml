@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "atsuko"
+version = "0.1.0"
+authors = [
+  { name="Marcello Del Buono", email="m.delbuono@gmail.com" },
+]
+description = "A tool for easily create command-line interfaces."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = []
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/onlabsorg/atsuko"
+Issues = "https://github.com/onlabsorg/atsuko/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
