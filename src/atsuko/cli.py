@@ -117,12 +117,12 @@ class CLI:
         return self.commands[name]
 
 
-    def parse (self, args=sys.argv[1:]):
-        """Parses a list of command-line tokens
+    @property
+    def parser (self):
+        """ Command-line parser
 
-        This method uses argparse internally to translate the commands defined
-        with the .command decorator into a parser. Then executes the parser and
-        returns its output.
+        This property maps to an argparse parser based on the commands
+        registered using the .command decorator.
         """
         import argparse
 
@@ -152,17 +152,9 @@ class CLI:
             # ... ... add parameters ...
             for param in command.parameters.values():
 
-                if param.type == _VarArgs:  # Variable Positional Arguments
-                    cmd_parser.add_argument(
-                        param.name,
-                        help=param.description,
-                        nargs="*",
-                        action='store'
-                    )
-
-                elif param.required:  # positional parameters
-                    cmd_parser.add_argument(
-                        param.name,
+                if param.required:  # positional parameters
+                    name = param.name
+                    opts = dict(
                         type=param.type,
                         help=param.description,
                         choices=param.choices,
@@ -170,16 +162,16 @@ class CLI:
                     )
 
                 elif param.type == bool:    # boolean flags
-                    cmd_parser.add_argument(
-                        f"--{param.name}",
+                    name = f"--{param.name}",
+                    opts = dict(
                         help=param.description,
                         required=False,
                         action = 'store_false' if bool(param.default) else 'store_true'
                     )
 
                 else:  # any other type of optional parameters
-                    cmd_parser.add_argument(
-                        f"--{param.name}",
+                    name = f"--{param.name}",
+                    opts = dict(
                         type=param.type,
                         help=param.description,
                         required=False,
@@ -188,7 +180,9 @@ class CLI:
                         action='store'
                     )
 
-        return parser.parse_args(args)
+                cmd_parser.add_argument(name, **opts)
+
+        return parser
 
 
     def run (self, args=sys.argv[1:]):
@@ -197,14 +191,16 @@ class CLI:
         Args:
             args: A list of command-line arguments. Defaults to `sys.argv[1:]`.
         """
+        parser = self.parser
+
         # If the script is called without parameters,
         # print the help message
         if not args:
-            self.parser.print_help()
+            parser.print_help()
             return
 
         # Parse the arguments
-        argns = self.parse(args)
+        argns = parser.parse_args(args)
 
         # Detect the command
         command = self.commands.get(args[0], None)
@@ -312,10 +308,7 @@ class Command:
             of keyword arguments.
         """
         args = [params[name] for name, param in self.parameters.items() if param.required]
-        kwargs = {name: params[name] for name, param in self.parameters.items() if not param.required and param.type != _VarArgs}
-        for name, param in self.parameters.items():
-            if param.type == _VarArgs:
-                args += params[name]
+        kwargs = {name: params[name] for name, param in self.parameters.items() if not param.required}
         return args, kwargs
 
     def __call__(self, *args, **kwargs):
@@ -336,7 +329,6 @@ class CommandParameter:
 
     Attributes:
         name: The parameter name.
-        pretty_name: A human-readable name to be used for documentation.
         type: The expected type of the parameter (e.g. str, int, bool, etc.).
         description: A description of the parameter to be used for documentation.
         choices: A list of valid values for the parameter.
@@ -345,82 +337,68 @@ class CommandParameter:
         default: The default value for optional parameters.
     """
 
-    def __init__ (self, param_info):
+    def __init__ (self, signature_parameter):
         """Initializes the Parameter.
 
         Args:
             param_info: An `inspect.Parameter` object.
         """
         import inspect
-        EMPTY = inspect._empty
-
-        # Parameter name
-        self.name = param_info.name
 
         # Validate the parameter type
-        if param_info.kind == inspect.Parameter.VAR_KEYWORD:
+        if signature_parameter.kind == inspect.Parameter.VAR_KEYWORD:
             raise TypeError("Variable number of optional arguments not supported")
 
-        # Extract the user-defined annotation parameters
-        if isinstance(param_info.annotation, ParameterAnnotation):
-            self.pretty_name = param_info.annotation.name
-            self.type = param_info.annotation.type
-            self.description = param_info.annotation.description
-            self.choices = param_info.annotation.choices
+        if signature_parameter.kind == inspect.Parameter.VAR_POSITIONAL:
+            raise TypeError("Variable number of positional arguments not supported")
 
-        elif isinstance(param_info.annotation, type) and param_info.annotation != EMPTY:
-            self.pretty_name = self.name
-            self.type = param_info.annotation
-            self.description = f"Parameter '{self.name}' of {str(self.type_name)}"
-            self.choices = None
-
-        elif param_info.default != EMPTY and param_info.default != None:
-            self.pretty_name = self.name
-            self.type = type(param_info.default)
-            self.description = f"Parameter '{self.name}' of {str(self.type_name)}"
-            self.choices = None
-
-        else:
-            self.pretty_name = self.name
-            self.type = str
-            self.description = f"Parameter '{self.name}' of {str(self.type_name)}"
-            self.choices = None
-
-        # Define if the parameter is required (doesn't have a default value)
-        # and if not, defines its default value.
-        if param_info.default == EMPTY:
-            self.required = True
-            self.default = None
-        else:
-            self.required = False
-            self.default = param_info.default
-
-        # Modify thype and default value in case of variable positional arguments
-        if param_info.kind == inspect.Parameter.VAR_POSITIONAL:
-            self.type = _VarArgs
-            self.required = False
-            self.default = []
-
+        # Store the signature parameter information in a private attribute
+        self._signature_param = signature_parameter
 
     @cached_property
-    def type_name(self):
-        """A pretty name for this parameter type."""
-        if self.type == str:
-            return "Text"
-        elif self.type == int or self.type == float:
-            return "Number"
-        elif self.type == bool:
-            return "Boolean"
-        elif self.type == _VarArgs:
-            return "ListOfArguments"
+    def name (self):
+        return self._signature_param.name
+
+    @cached_property
+    def required (self):
+        sigp = self._signature_param
+        return sigp.default == sigp.empty
+
+    @cached_property
+    def default (self):
+        sigp = self._signature_param
+        return sigp.default if sigp.default != sigp.empty else None
+
+    @cached_property
+    def type (self):
+        sigp = self._signature_param
+
+        if isinstance(sigp.annotation, ParameterAnnotation):
+            return sigp.annotation.type
+
+        elif isinstance(sigp.annotation, type) and sigp.annotation != sigp.empty:
+            return sigp.annotation
+
+        elif self.default != None:
+            return type(self.default)
+
         else:
-            return str(self.type)
+            return str
 
+    @cached_property
+    def description (self):
+        sigp = self._signature_param
 
-class _VarArgs (list):
-    # Type used internally by the Parameter class
-    # to identify variable positional arguments.
-    pass
+        if isinstance(sigp.annotation, ParameterAnnotation):
+            return sigp.annotation.description
+
+        else:
+            return f"Parameter '{self.name}' of {self.type}"
+
+    @cached_property
+    def choices (self):
+        annotation = self._signature_param.annotation
+        return annotation.choices if isinstance(annotation, ParameterAnnotation) else None
 
 
 
@@ -432,7 +410,6 @@ class ParameterAnnotation:
     the parameter as an annotation.
 
     Attributes:
-        name: A pretty name for the command to be used in the GUI and documentation.
         type: The parameter type. Supported types are currently `str`, `int`,
             `float`, and `bool`. All other types are treated as strings.
         description: A description of the parameter to be used for documentation purposes.
@@ -442,17 +419,14 @@ class ParameterAnnotation:
         >>> @clo.command
         ... def sum(
         ...     a: Parameter(
-        ...         name="Addend1",
         ...         type=float,
         ...         description="First addend."
         ...     ),
         ...     b: Parameter(
-        ...         name="Addend2",
         ...         type=float,
         ...         description="Second addend."
         ...     ),
         ...     prec: Parameter(
-        ...         name="Precision",
         ...         type=int,
         ...         description="Result decimal precision, default to 2"
         ...     ) = 2
@@ -460,7 +434,6 @@ class ParameterAnnotation:
         ...     cli.log(round(a + b, prec))
     """
 
-    name: str
     type: type = str
     description: str = ""
     choices: list = None
