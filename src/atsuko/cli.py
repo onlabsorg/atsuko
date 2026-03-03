@@ -47,12 +47,9 @@ In the previous example, the `msg` parameter is a positional parameter, while th
 presence of a default value.
 '''
 
-import os
 import sys
-from datetime import datetime
 from dataclasses import dataclass
 from functools import cached_property
-
 
 
 
@@ -162,7 +159,7 @@ class CLI:
                     )
 
                 elif param.type == bool:    # boolean flags
-                    name = f"--{param.name}",
+                    name = f"--{param.name}"
                     opts = dict(
                         help=param.description,
                         required=False,
@@ -170,7 +167,7 @@ class CLI:
                     )
 
                 else:  # any other type of optional parameters
-                    name = f"--{param.name}",
+                    name = f"--{param.name}"
                     opts = dict(
                         type=param.type,
                         help=param.description,
@@ -216,7 +213,6 @@ class CLI:
         # Execute the command
         args, kwargs = command.split_parameters(vars(argns))
         command(*args, **kwargs)
-
 
 
 @dataclass
@@ -357,7 +353,7 @@ class CommandParameter:
 
     @cached_property
     def name (self):
-        return self._signature_param.name
+        return self._signature_param.name.replace("_", "-")
 
     @cached_property
     def required (self):
@@ -392,14 +388,16 @@ class CommandParameter:
         if isinstance(sigp.annotation, ParameterAnnotation):
             return sigp.annotation.description
 
+        elif type(sigp.annotation) == str:
+            return sigp.annotation
+
         else:
-            return f"Parameter '{self.name}' of {self.type}"
+            return f"Parameter '{self.name}' of {str(self.type)[1:-1]}"
 
     @cached_property
     def choices (self):
         annotation = self._signature_param.annotation
         return annotation.choices if isinstance(annotation, ParameterAnnotation) else None
-
 
 
 @dataclass

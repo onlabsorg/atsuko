@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+# Byte-compiled / optimized / DLL file
 __pycache__/
 *.py[codz]
 *$py.class
@@ -208,3 +208,4 @@ __marimo__/
 
 # Private folders
 locals/
+todo.*.md
