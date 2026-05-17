@@ -10,13 +10,15 @@ authors = [
 ]
 description = "A tool for easily create command-line interfaces."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
-dependencies = []
+dependencies = [
+    "pytest>=9.0.3",
+]
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 
