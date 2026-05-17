@@ -2,6 +2,12 @@
 
 A tool for easily create command-line interfaces in Python.
 
+> I discovered that a tool like atsuko already exists and is much more advanced: 
+> its name is [typer](https://github.com/fastapi/typer). It does exactly what I 
+> planned for atsuko to do, so I recommend using typer instead of atsuko.
+>
+> I will stop developing this package.
+
 ## Installation
 
 Install `atsuko` using `pip`:
